@@ -1609,3 +1609,136 @@ void get_next_state(const char text_board_representation[], int action, char nex
     increase_counter(&i, &k, text_board_representation, next_state);
     next_state[k] = '\0';
 }
+
+void print_action(const char text_board_representation[], int action)
+{
+    char board[BOARD_SIZE][BOARD_SIZE][2];
+    int x_from, y_from, move_num;
+    int x_to, y_to;
+    char piece_color, piece_type, player_color, next_piece_type;
+    int i, move_len;
+
+    init_board(text_board_representation, board);
+
+    x_from = (action / 109) % 14;
+    y_from = (action / 109) / 14;
+    move_num = action % 109;
+
+    i = 1;
+    while(text_board_representation[i - 1] != ' ')
+        i++;
+    player_color = text_board_representation[i];
+
+    piece_color = player_color;
+    piece_type = board[y_from][x_from][1];
+    next_piece_type = piece_type;
+
+    if(y_from == 9 && move_num < 100 && piece_type == 'p')
+        next_piece_type = 'q';
+    
+    if(action == CASTLE_K)
+    {
+        printf("%c O-O\n", piece_color);
+        return;
+    }
+    else if(action == CASTLE_Q)
+    {
+        printf("%c O--O\n", piece_color);
+        return;
+    }
+    else if(move_num < 13)
+    {
+        move_len = move_num + 1;
+        x_to = x_from;
+        y_to = y_from + move_len;
+    }
+    else if(move_num >= 13 && move_num < 26)
+    {
+        move_len = move_num - 12;
+        x_to = x_from + move_len;
+        y_to = y_from;
+    }
+    else if(move_num >= 26 && move_num < 39)
+    {
+        move_len = move_num - 25;
+        x_to = x_from;
+        y_to = y_from - move_len;
+    }
+    else if(move_num >= 39 && move_num < 52)
+    {
+        move_len = move_num - 38;
+        x_to = x_from - move_len;
+        y_to = y_from;
+    }
+    else if(move_num >= 52 && move_num < 62)
+    {
+        move_len = move_num - 51;
+        x_to = x_from + move_len;
+        y_to = y_from + move_len;
+    }
+    else if(move_num >= 62 && move_num < 72)
+    {
+        move_len = move_num - 61;
+        x_to = x_from + move_len;
+        y_to = y_from - move_len;
+    }
+    else if(move_num >= 72 && move_num < 82)
+    {
+        move_len = move_num - 71;
+        x_to = x_from - move_len;
+        y_to = y_from - move_len;
+    }
+    else if(move_num >= 82 && move_num < 92)
+    {
+        move_len = move_num - 81;
+        x_to = x_from - move_len;
+        y_to = y_from + move_len;
+    }
+    else if(move_num >= 92 && move_num < 100)
+    {
+        int x_offsets[8] = {-1, 1, 2, 2, 1, -1, -2, -2};
+        int y_offsets[8] = {2, 2, 1, -1, -2, -2, -1, 1};
+        int x_diff = x_offsets[move_num - 92];
+        int y_diff = y_offsets[move_num - 92];
+        x_to = x_from + x_diff;
+        y_to = y_from + y_diff;
+    }
+    else if(move_num >= 100 && move_num < 109)
+    {
+        int promote_to_num, move_to_num;
+        promote_to_num = (move_num - 100) % 3;
+        move_to_num = (move_num - 100) / 3;
+        switch(promote_to_num)
+        {
+            case 0:
+                next_piece_type = 'r';
+                break;
+            case 1:
+                next_piece_type = 'n';
+                break;
+            case 2:
+                next_piece_type = 'b';
+                break;              
+        }
+        switch(move_to_num)
+        {
+            case 0:
+                x_to = x_from - 1;
+                y_to = y_from + 1;
+                break;
+            case 1:
+                x_to = x_from;
+                y_to = y_from + 1;
+                break;
+            case 2:
+                x_to = x_from + 1;
+                y_to = y_from + 1;
+                break;          
+        }
+    }
+    if(piece_type == next_piece_type)
+        printf("%c %c (%d %d)->(%d %d)\n", piece_color, piece_type, x_from, y_from, x_to, y_to);
+    else
+        printf("%c %c promote to %c (%d %d)->(%d %d)\n", piece_color, piece_type, next_piece_type,
+                x_from, y_from, x_to, y_to);
+}

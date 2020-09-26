@@ -40,10 +40,40 @@ class NodeStateAction:
         return self.q_val + c_puct * np.sqrt(self.parent.times_visited) / (1 + self.times_visited)
 
     def delete(self):
+        del self.parent
         for child in self.children:
             child.delete()
             del child
-        del self
+
+
+class Root:
+
+    def __init__(self, state, canonical_board, player, board_repetitions, history_len, children, nn_input=None):
+        self.state = state
+        self.canonical_board = canonical_board
+        self.player = player
+        self.board_repetitions = copy.copy(board_repetitions)
+        if nn_input is None:
+            prev_input = np.zeros((24 * history_len + 15, 14, 14))
+            tmp_game_env = GameEnv(history_len)
+            self.nn_input = tmp_game_env.get_nn_input(state, 0, prev_input)
+        else:
+            self.nn_input = nn_input
+        self.children = children
+        for child in children:
+            child.parent = self
+        self.times_visited = 0
+
+    def is_root(self):
+        return True
+
+    def is_leaf(self):
+        return False
+
+    def delete(self):
+        for child in self.children:
+            child.delete()
+            del child
 
 
 class MCTS:
@@ -53,8 +83,6 @@ class MCTS:
         self.model = model
         self.history_len = history_len
         canonical_board = self.game_env.get_canonical_board_text(state)
-        self.root = NodeStateAction(state, canonical_board, None, None, player, None, {},
-                                    history_len)
         self.tau = tau
         prev_input = np.zeros((24 * history_len + 15, 14, 14))
         nn_input = self.game_env.get_nn_input(state, 0, prev_input)
@@ -62,9 +90,13 @@ class MCTS:
         prior_probs, v = self.model.predict(nn_input)
         prior_probs = prior_probs.reshape((-1))
         available_actions = self.game_env.get_available_actions(state)
+        children = set()
+        board_repetitions = {canonical_board: 1}
         for action, prior_prob in zip(available_actions, prior_probs[available_actions]):
-            self.root.children.add(NodeStateAction(state, canonical_board, action, self.root, player, prior_prob,
-                                                   {}, history_len, nn_input))
+            next_state, next_canonical_board = self.game_env.get_next_state(state, action)
+            children.add(NodeStateAction(next_state, next_canonical_board, action, None, player, prior_prob,
+                                         board_repetitions, history_len, nn_input))
+        self.root = Root(state, canonical_board, player, board_repetitions, history_len, children, nn_input)
 
     def select(self):
         '''
@@ -141,12 +173,12 @@ class MCTS:
     def from_node(cls, node, model, history_len, tau=1):
         mcts = cls(node.state, node.player, model, history_len, tau)
         if not node.is_leaf():
-            mcts.root = node
-        else:
-            mcts.root.board_repetitions = copy.copy(node.board_repetitions)
-        mcts.root.parent = None
-        mcts.root.action = None
-        mcts.root.prior_prob = None
+            mcts.root.children = node.children
+            for child in mcts.root.children:
+                child.parent = mcts.root
+        mcts.root.board_repetitions = copy.copy(node.board_repetitions)
+        mcts.root.nn_input = node.nn_input
+        mcts.root.times_visited = node.times_visited
         return mcts
 
     def get_subtree_from_action(self, action, model=None, tau=None):

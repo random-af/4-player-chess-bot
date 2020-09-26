@@ -12,6 +12,7 @@ class FourPCnn(nn.Module):
         self.conv1 = nn.Conv2d(24 * history_len + 15, 256, 5, stride=1, padding=2)  # out size: 256 x 14 x 14
         self.conv2 = nn.Conv2d(256, 256, 3, stride=1, padding=1)  # out size: 256 x 14 x 14
         self.conv3 = nn.Conv2d(256, 256, 3, stride=1, padding=1)  # out size: 256 x 14 x 14
+        self.conv4 = nn.Conv2d(256, 256, 3, stride=1, padding=1)  # out size: 256 x 14 x 14
         self.conv5 = nn.Conv2d(256, 256, 3, stride=1)  # out size: 256 x 12 x 12
         self.conv6 = nn.Conv2d(256, 256, 3, stride=1)  # out size: 256 x 10 x 10
         self.conv7 = nn.Conv2d(256, 256, 3, stride=1)  # out size: 256 x 8 x 8
@@ -32,7 +33,7 @@ class FourPCnn(nn.Module):
         self.conv1_prob = nn.Conv2d(256, 256, 3, stride=1, padding=1)  # out size: 256 x 8 x 8
         self.conv2_prob = nn.Conv2d(256, 256, 3, stride=1, padding=1)  # out size: 256 x 8 x 8
         self.bn1_prob = nn.BatchNorm2d(256)
-        self.bn1_prob = nn.BatchNorm2d(256)
+        self.bn2_prob = nn.BatchNorm2d(256)
         self.fc_prob = nn.Linear(8 * 8 * 256, 21366)
 
     def forward(self, x):

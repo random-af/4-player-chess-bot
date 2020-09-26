@@ -17,7 +17,10 @@ class GameEnv:
         nn_input = (((ctypes.c_int * 14) * 14) * 39)()
         self.game_env_module.text_to_nn_input(text_board_representation.encode('ascii'), nn_input, repetition_count)
         nn_input = np.array(nn_input)
-        return np.concatenate((prev_input[24: -15, :, :], nn_input))
+        if self.history_len > 1:
+            return np.concatenate((prev_input[24: -15, :, :], nn_input))
+        else:
+            return nn_input
 
     def make_action(self, action):
         self.curr_state, self.canonical_board = self.get_next_state(self.curr_state, action)
@@ -48,18 +51,7 @@ class GameEnv:
         next_state = (ctypes.c_char * 500)()
         canonical_board_text = (ctypes.c_char * 500)()
         self.game_env_module.get_next_state(state.encode('ascii'), action, next_state, canonical_board_text)
-
-        try:
-            next_state_res = next_state.value.decode('utf-8')
-            canonical_board_text_res = canonical_board_text.value.decode('utf-8')
-        except UnicodeDecodeError:
-            print('decode err')
-            print('state ', state)
-            print('action ', action)
-            print('next state ', next_state.value)
-            print('canon board', canonical_board_text.value)
-            sys.exit()
-        return next_state_res, canonical_board_text_res
+        return next_state.value.decode('utf-8'), canonical_board_text.value.decode('utf-8')
 
     def get_available_actions(self, state):
         a = (ctypes.c_int * 1000)()
@@ -85,3 +77,8 @@ class GameEnv:
         board = (((ctypes.c_char * 2) * 14) * 14)()
         self.game_env_module.init_board(state.encode('ascii'), board)
         self.game_env_module.draw_board(board)
+
+    def print_action(self, state, action):
+        action = ctypes.c_int(action)
+        self.game_env_module.print_action(state.encode('ascii'), action)
+

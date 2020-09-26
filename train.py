@@ -12,14 +12,14 @@ import nvidia_smi
 
 def del_data():
     i = 0
-    while os.path.isfile('./games{}.pkl'.format(i)):
-        os.remove('./games{}.pkl'.format(i))
+    while os.path.isfile('./data/games{}.pkl'.format(i)):
+        os.remove('./data/games{}.pkl'.format(i))
         i += 1
 
 
 def get_last_data_num():
     i = 0
-    while os.path.isfile('./games{}.pkl'.format(i)):
+    while os.path.isfile('./data/games{}.pkl'.format(i)):
         i += 1
     return i - 1
 
@@ -42,8 +42,9 @@ def get_best_model(history_len):
     best_model = FourPCnn(history_len)
     i = 0
     while os.path.isfile('./model{}s.pkl'.format(i)):
-        load_model(best_model, './model{}s.pkl'.format(i))
         i += 1
+    if i != 0:
+        load_model(best_model, './model{}s.pkl'.format(i - 1))
     return best_model, i
 
 
@@ -53,13 +54,13 @@ def load_model(model, name):
 
 
 def save_data(data, name_num):
-    with open('games{}.pkl'.format(name_num), 'wb') as f:
+    with open('./data/games{}.pkl'.format(name_num), 'wb') as f:
         pickle.dump(data, f)
-    return os.path.isfile('games{}.pkl'.format(name_num))
+    return os.path.isfile('./data/games{}.pkl'.format(name_num))
 
 
 def load_data(name_num):
-    with open('games{}.pkl'.format(name_num), 'rb') as f:
+    with open('./data/games{}.pkl'.format(name_num), 'rb') as f:
         return pickle.load(f)
 
 
@@ -73,7 +74,7 @@ def print_gpu_info(idx=0):
     nvidia_smi.nvmlShutdown()
 
 
-def play_episode(nn, n_sims, history_len):
+def play_episode(nn, n_sims, history_len, print_actions=False):
     data = []
     game_env = GameEnv(history_len)
     state = game_env.get_starting_state()
@@ -84,6 +85,8 @@ def play_episode(nn, n_sims, history_len):
     while res is None:
         action_probs = mcts.get_action_probs(n_sims)
         action = np.random.choice(21366, p=action_probs)  # 21365 is max action num
+        if print_actions:
+            game_env.print_action(game_env.curr_state, action)
         canonical_board = game_env.get_canonical_board_text(state)
         nn_input = game_env.get_nn_input(state, game_env.board_repetitions[canonical_board], prev_input)
         data.append([nn_input, action_probs, None])
@@ -107,7 +110,7 @@ def train_nn(nn, last_data_num):
     if last_data_num < 0:
         raise Exception('no data to train nn')
     batch_size = 32
-    total_steps = 3 * 10**5
+    total_steps = 5 * 10**4
     opt = torch.optim.Adam(nn.parameters(), lr=1e-4)
     start_time = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -159,7 +162,7 @@ def check_winrate(nn1, nn2, n_sims, n_games, history_len, write_data=False):
         episode_data = []
         while res is None:
             action1_probs = mcts_1.get_action_probs(n_sims)
-            action1 = np.argmax(action1_probs)
+            action1 = np.random.choice(21366, p=action1_probs)  # 21365 is max action num
             canonical_board = game_env.get_canonical_board_text(game_env.curr_state)
             nn_input = game_env.get_nn_input(game_env.curr_state, game_env.board_repetitions[canonical_board],
                                              prev_input)
@@ -179,7 +182,7 @@ def check_winrate(nn1, nn2, n_sims, n_games, history_len, write_data=False):
                 break
 
             action2_probs = mcts_2.get_action_probs(n_sims)
-            action2 = np.argmax(action2_probs)
+            action2 = np.random.choice(21366, p=action2_probs)  # 21365 is max action num
             canonical_board = game_env.get_canonical_board_text(game_env.curr_state)
             nn_input = game_env.get_nn_input(game_env.curr_state, game_env.board_repetitions[canonical_board],
                                              prev_input)
@@ -220,10 +223,11 @@ def check_winrate(nn1, nn2, n_sims, n_games, history_len, write_data=False):
 def main():
     num_iters = 1000
     num_episodes = 100
-    n_sims = 200
+    n_sims = 500
     n_games = 100
-    history_len = 4
+    history_len = 1
     threshold = 0.04
+    check_winrate = False
     nn, best_model_num = get_best_model(history_len)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     nn.to(device)
@@ -238,25 +242,26 @@ def main():
         new_nn.load_state_dict(nn.state_dict())
         train_data = []
         for j in tqdm(range(1, num_episodes + 1), desc='Episodes '):
-            if last_data_num >= j / 5:
+            if last_data_num >= j:
                 print('skipping already collected data ', j)
                 continue
             # train_data.append(play_episode(new_nn, n_sims, history_len))
             train_data += play_episode(new_nn, n_sims, history_len)
-            if j % 5 == 0:
-                did_save = save_data(train_data, last_data_num)
-                last_data_num += 1
-                train_data = []
-                if not did_save:
-                    print('no free space to write new data')
-                    break
+            did_save = save_data(train_data, last_data_num)
+            last_data_num += 1
+            train_data = []
+            if not did_save:
+                print('no free space to write new data')
+                break
         last_data_num = get_last_data_num()
         train_nn(new_nn, last_data_num)
         save_model(nn, i)
         del_data()
         if not os.path.isfile('./model{}.pkl'.format(i)):
             save_model(nn, i)
-        winrate = check_winrate(new_nn, nn, n_sims, n_games, history_len, False)
+        winrate = 1
+        if check_winrate:
+            winrate = check_winrate(new_nn, nn, n_sims, n_games, history_len, False)
         print('winrate {}'.format(winrate))
         if winrate >= threshold:
             nn = new_nn
