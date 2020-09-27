@@ -296,6 +296,7 @@ void find_king(int *king_x, int *king_y, char board[BOARD_SIZE][BOARD_SIZE][2], 
             {
                 *king_x = j;
                 *king_y = i;
+                return;
             }
 }
 
@@ -950,7 +951,7 @@ void get_available_actions(const char text_board_representation[], int a[1000])
     int castle_k, castle_q;
     int checked_directions[16][2];
     int i, j;
-    int king_x, king_y;
+    int king_x = 0, king_y = 0;
     char enemy_left_color, enemy_right_color, ally_color;
     int checks_count;
     
@@ -968,6 +969,12 @@ void get_available_actions(const char text_board_representation[], int a[1000])
     //draw_checks(checked_directions);
     
     find_king(&king_x, &king_y, board, player_color);
+    if(king_x == 0 && king_y == 0)
+    {
+        for(i = 0; i < 1000; i++)
+            a[i] = actions[i];
+        return;
+    }
     checks_count = 0;
     for(i = 0; i < 16; i++)
         checks_count += (checked_directions[i][0] != 0 || checked_directions[i][1] != 0);   
