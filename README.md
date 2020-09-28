@@ -1,5 +1,5 @@
-# 4 player chess bot
-This repository contains utilities for training a bot for 4 player chess game. Implementation is based on recent [alpha zero](https://www.nature.com/articles/nature24270.epdf?author_access_token=VJXbVjaSHxFoctQQ4p2k4tRgN0jAjWel9jnR3ZoTv0PVW4gB86EEpGqTRDtpIz-2rmo8-KG06gqVobU5NSCFeHILHcVFUeMsbvwS-lxjqQGg98faovwjxeTUgZAUMnRQ) algorithm done with PyTorch. It proposes training bot by self-play using MCTS with neural network evaluation as rollout.
+# 4 player chess engine
+This repository contains utilities for training an engine for 4 player chess game. Implementation is based on recent [alpha zero](https://www.nature.com/articles/nature24270.epdf?author_access_token=VJXbVjaSHxFoctQQ4p2k4tRgN0jAjWel9jnR3ZoTv0PVW4gB86EEpGqTRDtpIz-2rmo8-KG06gqVobU5NSCFeHILHcVFUeMsbvwS-lxjqQGg98faovwjxeTUgZAUMnRQ) algorithm done with PyTorch. It proposes training engine by self-play using MCTS with neural network evaluation as rollout.
 ## Training
 1. Compile game_env.c
 `gcc -shared -Wl,-soname,game_env.so -o game_env.so -fPIC game_env.c`
