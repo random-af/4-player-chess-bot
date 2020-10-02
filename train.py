@@ -172,7 +172,8 @@ def check_winrate(nn1, nn2, n_sims, n_games, history_len, write_data=False):
             next_state = game_env.make_action(action1)
             mcts_1 = mcts_1.get_subtree_from_action(action1)
             if mcts_2 is None:
-                mcts_2 = MCTS(next_state, -1, player2_model, history_len)
+                mcts_2 = MCTS(next_state, -1, player2_model, history_len,
+                              prev_input=nn_input, board_repetitions={starting_state: 1})
             else:
                 mcts_2 = mcts_2.get_subtree_from_action(action1)
             res = game_env.get_game_result(next_state)
@@ -222,12 +223,12 @@ def check_winrate(nn1, nn2, n_sims, n_games, history_len, write_data=False):
 
 def main():
     num_iters = 1000
-    num_episodes = 100
-    n_sims = 500
+    num_episodes = 1
+    n_sims = 3
     n_games = 100
     history_len = 1
     threshold = 0.04
-    check_winrate = False
+    check_winrate_to_update = True
     nn, best_model_num = get_best_model(history_len)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     nn.to(device)
@@ -260,7 +261,7 @@ def main():
         if not os.path.isfile('./model{}.pkl'.format(i)):
             save_model(nn, i)
         winrate = 1
-        if check_winrate:
+        if check_winrate_to_update:
             winrate = check_winrate(new_nn, nn, n_sims, n_games, history_len, False)
         print('winrate {}'.format(winrate))
         if winrate >= threshold:

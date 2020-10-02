@@ -82,7 +82,7 @@ class Root:
 
 class MCTS:
 
-    def __init__(self, state, player, model, history_len, tau=1, prev_input=None):
+    def __init__(self, state, player, model, history_len, tau=1, prev_input=None, board_repetitions={}):
         self.game_env = GameEnv(history_len)
         self.model = model
         self.history_len = history_len
@@ -90,16 +90,14 @@ class MCTS:
         self.tau = tau
         if prev_input is None:
             prev_input = np.zeros((24 * history_len + 15, 14, 14))
-        nn_input = self.game_env.get_nn_input(state, 0, prev_input)
+        nn_input = self.game_env.get_nn_input(state, 1, prev_input)
         self.model.eval()
         prior_probs, v = self.model.predict(nn_input)
         prior_probs = prior_probs.reshape((-1))
         available_actions = self.game_env.get_available_actions(state)
         children = set()
-        board_repetitions = {}
         for action, prior_prob in zip(available_actions, prior_probs[available_actions]):
-            next_state, next_canonical_board = self.game_env.get_next_state(state, action)
-            children.add(NodeStateAction(next_state, next_canonical_board, action, None, player, prior_prob,
+            children.add(NodeStateAction(state, canonical_board, action, None, player, prior_prob,
                                          board_repetitions, history_len, nn_input))
         self.root = Root(state, canonical_board, player, board_repetitions, history_len, children, nn_input)
 
@@ -130,11 +128,10 @@ class MCTS:
             return -game_result
         available_actions = self.game_env.get_available_actions(next_state)
         prev_input = leaf_node.nn_input
-        next_nn_input = self.game_env.get_nn_input(next_state,
-                                                   leaf_node.board_repetitions.setdefault(next_canonical_board, 0),
-                                                   prev_input)
+        next_nn_input = self.game_env.get_nn_input(next_state, board_repetitions[next_canonical_board], prev_input)
         self.model.eval()
         prior_probs, v = self.model.predict(next_nn_input)
+        v = v[0, 0]
         prior_probs = prior_probs.reshape((-1))
         for action, prior_prob in zip(available_actions, prior_probs[available_actions]):
             leaf_node.children.add(NodeStateAction(next_state, next_canonical_board, action, leaf_node,
@@ -175,14 +172,22 @@ class MCTS:
         return posterior_probs
 
     @classmethod
-    def from_node(cls, node, next_state, model, history_len, tau=1):
-        mcts = cls(next_state, node.player, model, history_len, tau, node.nn_input)
+    def from_node(cls, node, next_state, model, history_len, tau=1, next_canonical_board=None):
+        mcts = cls(next_state, -node.player, model, history_len, tau, node.nn_input)
+        if next_canonical_board is None:
+            next_canonical_board = mcts.game_env.get_canonical_board_text(next_state)
         if not node.is_leaf():
             mcts.root.children = node.children
             for child in mcts.root.children:
                 child.parent = mcts.root
         mcts.root.board_repetitions = copy.copy(node.board_repetitions)
-        mcts.root.nn_input = node.nn_input
+        if next_canonical_board in mcts.root.board_repetitions:
+            mcts.root.board_repetitions[next_canonical_board] += 1
+        else:
+            mcts.root.board_repetitions[next_canonical_board] = 1
+        mcts.root.nn_input = mcts.game_env.get_nn_input(mcts.root.state,
+                                                        mcts.root.board_repetitions[next_canonical_board],
+                                                        node.nn_input)
         mcts.root.times_visited = node.times_visited
         return mcts
 
@@ -194,8 +199,9 @@ class MCTS:
             tau = self.tau
         for child in self.root.children:
             if child.action == action:
-                next_state, _ = self.game_env.get_next_state(child.state, child.action)
-                mcts = MCTS.from_node(child, next_state, model, self.history_len, tau)
+                next_state, next_canonical_board = self.game_env.get_next_state(self.root.state, child.action)
+                mcts = MCTS.from_node(child, next_state, model, self.history_len, tau, next_canonical_board)
+                del child.parent
             else:
                 child.delete()
         if mcts is not None:
